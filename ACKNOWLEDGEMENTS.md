@@ -92,6 +92,56 @@
 
 ---
 
+### 💣 Vulnerability-Wiki-PoC
+**仓库**: [SourByte05/Vulnerability-Wiki-PoC](https://github.com/SourByte05/Vulnerability-Wiki-PoC)
+
+**描述**: 2024-至今 1Day 漏洞 PoC 深度研究与复现归档
+
+**亮点**:
+- 涵盖 OA、ERP、安防、数通等高价值资产漏洞
+- 大模型及容器等新兴领域漏洞
+- 按年份归档 (2024, 2025, 2026)
+- 实战导向，可直接用于渗透测试
+
+---
+
+### 🔴 cve_monitor
+**仓库**: [adminlove520/cve_monitor](https://github.com/adminlove520/cve_monitor)
+
+**描述**: 多平台 CVE RSS/Tracker 监控系统
+
+**亮点**:
+- 支持多平台 CVE 订阅
+- 实时 RSS 监控
+- 历史漏洞归档
+- 自动追踪最新披露
+
+---
+
+### 🐞 burp-mcp
+**仓库**: [PortSwigger/mcp-server](https://github.com/PortSwigger/mcp-server)
+
+**描述**: BurpSuite 官方 MCP 服务器
+
+**亮点**:
+- 官方支持，持续更新
+- 完整的 BurpSuite 功能调用
+- 支持所有 Pro 特性
+
+---
+
+### 🔴 redteam-mcp
+**仓库**: [ktol1/RedTeam-Agent](https://github.com/ktol1/RedTeam-Agent)
+
+**描述**: RedTeam 工具 MCP 服务器封装
+
+**亮点**:
+- 常用红队工具 MCP 化
+- 统一接口调用
+- 支持多种渗透工具
+
+---
+
 ## 📜 许可证
 
 所有子仓库均使用各自的开源许可证：

@@ -19,3 +19,15 @@
 [submodule "external/Anthropic-Cybersecurity-Skills"]
 	path = external/Anthropic-Cybersecurity-Skills
 	url = https://github.com/mukul975/Anthropic-Cybersecurity-Skills.git
+[submodule "external/cve_monitor"]
+	path = external/cve_monitor
+	url = https://github.com/adminlove520/cve_monitor.git
+[submodule "vendor/burp-mcp"]
+	path = vendor/burp-mcp
+	url = https://github.com/PortSwigger/mcp-server.git
+[submodule "vendor/redteam-mcp"]
+	path = vendor/redteam-mcp
+	url = https://github.com/ktol1/RedTeam-Agent.git
+[submodule "external/Vulnerability-Wiki-PoC"]
+	path = external/Vulnerability-Wiki-PoC
+	url = https://github.com/SourByte05/Vulnerability-Wiki-PoC.git
