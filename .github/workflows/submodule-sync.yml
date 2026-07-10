@@ -129,9 +129,14 @@ jobs:
 
           echo "PR created: $PR_URL"
 
-          # 添加 label（如果不存在会自动创建）
-          gh pr edit "$PR_URL" --add-label "submodule-update" || \
-          echo "Label 添加失败（可能需要仓库管理员创建）"
+          # 自动创建 label（如果不存在）
+          gh label create "submodule-update" \
+            --description "子仓库同步更新" \
+            --repo adminlove520/multi-CyberSecurity \
+            2>/dev/null || echo "label 已存在"
+
+          # 添加 label 到 PR
+          gh pr edit "$PR_URL" --add-label "submodule-update"
 
       - name: 上传报告
         uses: actions/upload-artifact@v4
