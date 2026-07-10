@@ -22,7 +22,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          submodules: false  # 手动控制
+          submodules: false
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Configure Git
@@ -34,15 +34,10 @@ jobs:
         id: submodules
         run: |
           git submodule status > submodule-status.txt
-          cat submodule-status.txt
-          echo "---"
-          # 提取子模块路径列表
           git submodule status | awk '{print $2}' > submodule-paths.txt
-          cat submodule-paths.txt
 
       - name: 初始化所有子模块
-        run: |
-          git submodule init
+        run: git submodule init
 
       - name: 同步到最新远程
         env:
@@ -58,34 +53,29 @@ jobs:
 
       - name: 生成同步报告
         run: |
-          cat << 'EOF' > submodule-sync-report.md
-          # 🔄 子仓库同步报告
-
-          **同步时间**: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
-          **触发方式**: ${{ github.event_name == 'schedule' && '定时任务' || '手动触发' }}
-
-          ## 同步结果
-
-          EOF
-
-          echo '| 子模块 | 同步前 commit | 同步后 commit | 状态 |' >> submodule-sync-report.md
-          echo '|--------|---------------|---------------|------|' >> submodule-sync-report.md
+          echo '# 🔄 子仓库同步报告' > submodule-sync-report.md
+          echo '' >> submodule-sync-report.md
+          echo '**同步时间**: $(date -u '"'"'+%Y-%m-%d %H:%M:%S UTC'"'"')' >> submodule-sync-report.md
+          echo '**触发方式**: ${{ github.event_name == '"'"'schedule'"'"' && '"'"'定时任务'"'"' || '"'"'手动触发'"'"' }}' >> submodule-sync-report.md
+          echo '' >> submodule-sync-report.md
+          echo '## 同步结果' >> submodule-sync-report.md
+          echo '' >> submodule-sync-report.md
+          echo '| 子模块 | 当前版本 | 远程版本 | 状态 |' >> submodule-sync-report.md
+          echo '|--------|----------|----------|------|' >> submodule-sync-report.md
 
           while IFS= read -r path; do
-            if [[ -n "$path" ]]; then
+            if [[ -n "$path" ]] && [[ -d "$path" ]]; then
               cd "$path" 2>/dev/null || continue
-
-              # 获取当前 HEAD
-              current=$(git rev-parse HEAD 2>/dev/null | cut -c1-7)
-              remote=$(git rev-parse origin/$(git branch --show-current) 2>/dev/null | cut -c1-7)
-
-              echo "| \`$path\` | \`$current\` | \`$remote\` | ✅ 已更新 |" >> ../submodule-sync-report.md
-
+              current=$(git rev-parse HEAD 2>/dev/null | cut -c1-7 || echo 'N/A')
+              remote=$(git rev-parse origin/main 2>/dev/null | cut -c1-7) || \
+                       remote=$(git rev-parse origin/master 2>/dev/null | cut -c1-7) || \
+                       remote='N/A'
               cd - > /dev/null
+              echo "| \`$path\` | \`$current\` | \`$remote\` | ✅ 已更新 |" >> submodule-sync-report.md
             fi
           done < submodule-paths.txt
 
-          echo "" >> submodule-sync-report.md
+          echo '' >> submodule-sync-report.md
           echo '---' >> submodule-sync-report.md
           echo '*由 GitHub Actions 自动生成*' >> submodule-sync-report.md
 
@@ -105,14 +95,11 @@ jobs:
 
       - name: 创建同步提交
         if: steps.check_changes.outputs.has_changes == 'true'
+        id: create_commit
         run: |
           BRANCH="submodule-sync-$(date +%Y%m%d-%H%M%S)"
           git checkout -b "$BRANCH"
-
-          # 添加所有变更
           git add .
-
-          # 提交
           git commit -m "chore: sync submodules to latest
 
           - Updated submodules to latest remote versions
@@ -120,10 +107,7 @@ jobs:
           - Timestamp: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
 
           Co-Authored-By: github-actions[bot] <github-actions[bot]@users.noreply.github.com>"
-
-          # 推送
           git push origin "$BRANCH"
-
           echo "branch=$BRANCH" >> $GITHUB_OUTPUT
 
       - name: 创建 PR
@@ -131,21 +115,27 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          BRANCH="${{ steps.create_commit.outputs.branch }}"
+          echo "使用分支: $BRANCH"
+
+          # 创建 PR
           PR_URL=$(gh pr create \
             --repo adminlove520/multi-CyberSecurity \
-            --head "${{ steps.push.outputs.branch }}" \
+            --head "$BRANCH" \
             --base main \
             --title "chore: sync submodules to latest" \
-            --body "$(cat submodule-sync-report.md)" \
+            --body "自动同步的子仓库更新" \
             --fill)
 
           echo "PR created: $PR_URL"
 
-          # 添加 label
-          gh pr edit "$PR_URL" --add-label "submodule-update"
+          # 添加 label（如果不存在会自动创建）
+          gh pr edit "$PR_URL" --add-label "submodule-update" || \
+          echo "Label 添加失败（可能需要仓库管理员创建）"
 
       - name: 上传报告
         uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: submodule-sync-report
           path: submodule-sync-report.md
