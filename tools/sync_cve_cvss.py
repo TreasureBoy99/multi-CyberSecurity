@@ -184,8 +184,9 @@ class CVSSSyncer:
     def get_recent_modified_cves(self, days: int = 7) -> list[str]:
         """获取最近修改的 CVE"""
         self._rate_limit()
-        pub_start = (datetime.now() - timedelta(days=days)).isoformat() + '+00:00'
-        url = f'{NVD_BASE_URL}?pubStartDate={pub_start}&resultsPerPage=1000'
+        pub_end = datetime.now().strftime('%Y-%m-%dT%H:%M:%S.000')
+        pub_start = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%dT%H:%M:%S.000')
+        url = f'{NVD_BASE_URL}?pubStartDate={pub_start}&pubEndDate={pub_end}&resultsPerPage=1000'
 
         try:
             req = urllib.request.Request(url, headers=self._get_headers())
