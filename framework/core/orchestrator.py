@@ -1,20 +1,197 @@
 """
 Mission Orchestrator for multi-CyberSecurity
 Coordinates multi-agent security operations
+
+增强特性:
+- 多级预算控制 (Campaign + Per-Agent)
+- 软阈值警告
+- 预算超支处理 (partial report)
 """
 
 import os
 import json
 import re
+import uuid
 from datetime import datetime
 from typing import Dict, List, Optional, Any
 from pathlib import Path
 
+# 默认配置
+DEFAULT_MAX_HOURS = 8.0
+DEFAULT_MAX_TOKENS = 100000
+DEFAULT_PER_AGENT_MAX_TOKENS = 20000
+DEFAULT_PER_AGENT_WARN_TOKENS = 15000
+DEFAULT_BUDGET_CHECK_INTERVAL = 5
+
+
+class BudgetController:
+    """
+    多级预算控制器
+
+    支持:
+    - Campaign 级别总预算
+    - Per-Agent 独立预算 (防止单一Agent耗尽)
+    - 软阈值警告 (50%, 80%)
+    - 硬限制超支处理
+    """
+
+    def __init__(
+        self,
+        max_hours: float = DEFAULT_MAX_HOURS,
+        max_tokens: int = DEFAULT_MAX_TOKENS,
+        per_agent_max: int = DEFAULT_PER_AGENT_MAX_TOKENS,
+        per_agent_warn: int = DEFAULT_PER_AGENT_WARN_TOKENS,
+    ):
+        self.max_hours = max_hours
+        self.max_tokens = max_tokens
+        self.per_agent_max = per_agent_max
+        self.per_agent_warn = per_agent_warn
+
+        self._hours_used = 0.0
+        self._tokens_used = 0
+        self._agent_budgets: Dict[str, Dict] = {}
+        self._warnings_issued: set = set()
+
+    def get_campaign_budget(self) -> Dict[str, Any]:
+        """获取 Campaign 级别预算状态"""
+        return {
+            "max_hours": self.max_hours,
+            "max_tokens": self.max_tokens,
+            "hours_used": self._hours_used,
+            "tokens_used": self._tokens_used,
+            "hours_remaining": max(0, self.max_hours - self._hours_used),
+            "tokens_remaining": max(0, self.max_tokens - self._tokens_used),
+            "hours_pct": (self._hours_used / self.max_hours * 100) if self.max_hours > 0 else 0,
+            "tokens_pct": (self._tokens_used / self.max_tokens * 100) if self.max_tokens > 0 else 0,
+        }
+
+    def get_agent_budget(self, agent_name: str) -> Dict[str, Any]:
+        """获取 Per-Agent 预算状态"""
+        if agent_name not in self._agent_budgets:
+            self._agent_budgets[agent_name] = {
+                "max_tokens": self.per_agent_max,
+                "warn_at_tokens": self.per_agent_warn,
+                "tokens_used": 0,
+                "warned_50": False,
+                "warned_80": False,
+            }
+        return self._agent_budgets[agent_name]
+
+    def check_campaign_budget(self, delta_hours: float = 0, delta_tokens: int = 0) -> tuple[bool, str]:
+        """
+        检查 Campaign 预算是否足够
+
+        Returns:
+            (can_proceed, reason)
+        """
+        new_hours = self._hours_used + delta_hours
+        new_tokens = self._tokens_used + delta_tokens
+
+        if self.max_hours > 0 and new_hours > self.max_hours:
+            return False, f"Campaign hours budget exceeded: {new_hours:.2f}/{self.max_hours}"
+        if self.max_tokens > 0 and new_tokens > self.max_tokens:
+            return False, f"Campaign token budget exceeded: {new_tokens}/{self.max_tokens}"
+
+        return True, "OK"
+
+    def check_agent_budget(self, agent_name: str, delta_tokens: int = 0) -> tuple[bool, str]:
+        """
+        检查 Per-Agent 预算是否足够
+
+        Returns:
+            (can_proceed, reason)
+        """
+        agent = self.get_agent_budget(agent_name)
+        new_tokens = agent["tokens_used"] + delta_tokens
+
+        if agent["max_tokens"] > 0 and new_tokens > agent["max_tokens"]:
+            return False, f"Agent {agent_name} token budget exceeded: {new_tokens}/{agent['max_tokens']}"
+
+        return True, "OK"
+
+    def update_campaign(self, delta_hours: float, delta_tokens: int):
+        """更新 Campaign 预算使用"""
+        self._hours_used += delta_hours
+        self._tokens_used += delta_tokens
+
+    def update_agent(self, agent_name: str, delta_tokens: int):
+        """更新 Per-Agent 预算使用"""
+        agent = self.get_agent_budget(agent_name)
+        agent["tokens_used"] += delta_tokens
+
+    def check_warnings(self, agent_name: str = None) -> List[Dict]:
+        """检查是否需要发出警告"""
+        warnings = []
+
+        # Campaign 级别警告
+        hours_pct = (self._hours_used / self.max_hours * 100) if self.max_hours > 0 else 0
+        tokens_pct = (self._tokens_used / self.max_tokens * 100) if self.max_tokens > 0 else 0
+
+        key_50 = "campaign_50"
+        key_80 = "campaign_80"
+
+        if hours_pct >= 50 and key_50 not in self._warnings_issued:
+            warnings.append({
+                "level": "warning",
+                "source": "campaign",
+                "threshold": "50%",
+                "message": f"Campaign budget at 50%: {hours_pct:.1f}% hours, {tokens_pct:.1f}% tokens",
+            })
+            self._warnings_issued.add(key_50)
+
+        if hours_pct >= 80 and key_80 not in self._warnings_issued:
+            warnings.append({
+                "level": "critical",
+                "source": "campaign",
+                "threshold": "80%",
+                "message": f"Campaign budget at 80%: {hours_pct:.1f}% hours, {tokens_pct:.1f}% tokens",
+            })
+            self._warnings_issued.add(key_80)
+
+        # Per-Agent 警告
+        if agent_name:
+            agent = self.get_agent_budget(agent_name)
+            tokens_pct = (agent["tokens_used"] / agent["max_tokens"] * 100) if agent["max_tokens"] > 0 else 0
+
+            warn_key = f"{agent_name}_50"
+            if tokens_pct >= 50 and warn_key not in self._warnings_issued:
+                warnings.append({
+                    "level": "warning",
+                    "source": "agent",
+                    "agent": agent_name,
+                    "threshold": "50%",
+                    "message": f"Agent {agent_name} budget at 50%: {tokens_pct:.1f}%",
+                })
+                self._warnings_issued.add(warn_key)
+
+        return warnings
+
+    def should_generate_partial_report(self) -> bool:
+        """检查是否应该生成部分报告 (预算耗尽时)"""
+        return (
+            (self.max_hours > 0 and self._hours_used >= self.max_hours) or
+            (self.max_tokens > 0 and self._tokens_used >= self.max_tokens)
+        )
+
+
 class MissionOrchestrator:
     """Orchestrates security missions with multi-agent coordination"""
-    
-    def __init__(self, mission_file="framework/MISSION_CONTROL.md"):
+
+    def __init__(
+        self,
+        mission_file: str = "framework/MISSION_CONTROL.md",
+        max_hours: float = DEFAULT_MAX_HOURS,
+        max_tokens: int = DEFAULT_MAX_TOKENS,
+    ):
         self.mission_file = mission_file
+        self.campaign_id = uuid.uuid4()
+
+        # 多级预算控制器
+        self.budget_controller = BudgetController(
+            max_hours=max_hours,
+            max_tokens=max_tokens,
+        )
+
         self.mission_data = {
             "project_name": "",
             "target": "",
@@ -22,7 +199,11 @@ class MissionOrchestrator:
             "current_stage": "",
             "tasks": [],
             "findings": [],
-            "agents": []
+            "agents": [],
+            "budget": {
+                "allocated": 0.0,
+                "spent": 0.0
+            }
         }
         self._ensure_framework_dir()
     
@@ -185,27 +366,119 @@ class MissionOrchestrator:
                 if status:
                     finding["status"] = status
                 break
-        
+
         self._update_mission_file()
-    
-    def set_budget(self, allocated: float):
-        """Set mission budget"""
-        self.mission_data["budget"]["allocated"] = allocated
+
+    # === 多级预算控制 ===
+
+    def set_budget(
+        self,
+        allocated: float = None,
+        max_hours: float = None,
+        max_tokens: int = None,
+        per_agent_max: int = None,
+        per_agent_warn: int = None,
+    ):
+        """
+        设置多级预算参数
+
+        Args:
+            allocated: 分配的预算金额 (美元)
+            max_hours: 最大 Agent 小时
+            max_tokens: 最大 Token 数
+            per_agent_max: 每个 Agent 最大 Token
+            per_agent_warn: 每个 Agent 警告阈值
+        """
+        if allocated is not None:
+            self.mission_data["budget"]["allocated"] = allocated
+        if max_hours is not None:
+            self.budget_controller.max_hours = max_hours
+        if max_tokens is not None:
+            self.budget_controller.max_tokens = max_tokens
+        if per_agent_max is not None:
+            self.budget_controller.per_agent_max = per_agent_max
+        if per_agent_warn is not None:
+            self.budget_controller.per_agent_warn = per_agent_warn
+
         self._update_mission_file()
-        self._append_log(f"Budget allocated: ${allocated:.2f}")
-    
-    def add_cost(self, cost: float):
-        """Add to spent budget"""
+
+        log_parts = []
+        if allocated is not None:
+            log_parts.append(f"${allocated:.2f}")
+        if max_hours is not None:
+            log_parts.append(f"{max_hours}h")
+        if max_tokens is not None:
+            log_parts.append(f"{max_tokens} tokens")
+
+        self._append_log(f"Budget configured: {', '.join(log_parts)}")
+
+    def get_budget_status(self) -> Dict[str, Any]:
+        """获取完整预算状态"""
+        campaign = self.budget_controller.get_campaign_budget()
+
+        return {
+            "campaign": campaign,
+            "per_agent": {
+                agent: self.budget_controller.get_agent_budget(agent)
+                for agent in self.budget_controller._agent_budgets
+            },
+            "warnings": self.budget_controller.check_warnings(),
+        }
+
+    def check_budget(self, agent_name: str = None, delta_hours: float = 0, delta_tokens: int = 0) -> tuple[bool, str]:
+        """
+        检查预算是否足够
+
+        Args:
+            agent_name: Agent 名称 (可选，用于 Per-Agent 检查)
+            delta_hours: 本次操作预计消耗的小时数
+            delta_tokens: 本次操作预计消耗的 Token 数
+
+        Returns:
+            (can_proceed, reason)
+        """
+        # Campaign 级别检查
+        ok, reason = self.budget_controller.check_campaign_budget(delta_hours, delta_tokens)
+        if not ok:
+            return False, reason
+
+        # Per-Agent 级别检查
+        if agent_name:
+            ok, reason = self.budget_controller.check_agent_budget(agent_name, delta_tokens)
+            if not ok:
+                return False, reason
+
+        return True, "OK"
+
+    def add_cost(self, cost: float, agent_name: str = None, tokens_used: int = 0, hours_used: float = 0):
+        """
+        添加成本到预算
+
+        Args:
+            cost: 美元成本
+            agent_name: Agent 名称 (可选，用于 Per-Agent 追踪)
+            tokens_used: Token 消耗 (用于 Per-Agent 预算)
+            hours_used: 小时消耗 (用于 Campaign 预算)
+        """
         self.mission_data["budget"]["spent"] += cost
+
+        # 更新多级预算
+        self.budget_controller.update_campaign(hours_used, tokens_used)
+
+        if agent_name:
+            self.budget_controller.update_agent(agent_name, tokens_used)
+
         self._update_mission_file()
-    
-    def check_budget(self, estimated_cost: float = 0.0) -> bool:
-        """Check if remaining budget is sufficient"""
-        allocated = self.mission_data["budget"]["allocated"]
-        spent = self.mission_data["budget"]["spent"]
-        remaining = allocated - spent
-        return remaining >= estimated_cost
-    
+
+        # 检查警告
+        warnings = self.budget_controller.check_warnings(agent_name)
+        for warning in warnings:
+            self._append_log(f"⚠️ {warning['message']}")
+
+    def should_generate_partial_report(self) -> bool:
+        """检查是否应该生成部分报告 (预算耗尽时)"""
+        return self.budget_controller.should_generate_partial_report()
+
     def set_stage(self, stage: str):
         """Update current mission stage"""
         old_stage = self.mission_data["current_stage"]
