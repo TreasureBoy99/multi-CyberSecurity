@@ -1,0 +1,5 @@
+external/AboutSecurity
+external/agency-agents
+external/agency-agents-zh
+external/reverse-skill
+vendor/codegraph
