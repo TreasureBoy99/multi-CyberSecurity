@@ -10,3 +10,6 @@
 [submodule "vendor/codegraph"]
 	path = vendor/codegraph
 	url = https://github.com/colbymchenry/codegraph.git
+[submodule "external/reverse-skill"]
+	path = external/reverse-skill
+	url = https://github.com/zhaoxuya520/reverse-skill.git

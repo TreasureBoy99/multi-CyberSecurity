@@ -1,0 +1,294 @@
+# 子仓库状态汇总报告
+# 收集所有子仓库的信息（版本、描述、最近更新），生成综合报告并推送到仓库
+
+name: Submodule Report
+
+on:
+  schedule:
+    # 每周一和周四生成报告
+    - cron: '0 10 * * 1,4'
+  workflow_dispatch:
+  repository_dispatch:
+
+jobs:
+  generate-report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+          recursive: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install requests PyYAML
+
+      - name: Generate comprehensive report
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python3 << 'PYEOF'
+          import os
+          import re
+          import subprocess
+          import json
+          from datetime import datetime, timedelta
+
+          def get_git_config(key):
+            try:
+              result = subprocess.run(
+                  ['git', 'config', '--get', key],
+                  capture_output=True, text=True, cwd=repo_root
+              )
+              return result.stdout.strip()
+            except:
+              return ''
+
+          def get_submodule_info(path, url):
+            info = {'path': path, 'url': url, 'status': 'unknown'}
+
+            try:
+              # 获取当前 commit
+              result = subprocess.run(
+                  ['git', 'rev-parse', 'HEAD'],
+                  capture_output=True, text=True, cwd=os.path.join(repo_root, path)
+              )
+              info['commit'] = result.stdout.strip()[:7] if result.returncode == 0 else 'N/A'
+
+               # 获取远程最新
+              subprocess.run(['git', 'fetch', '--quiet', 'origin'],
+                           cwd=os.path.join(repo_root, path),
+                           capture_output=True)
+              result = subprocess.run(
+                  ['git', 'rev-parse', 'origin/main'] if True else ['git', 'rev-parse', 'origin/master'],
+                  capture_output=True, text=True, cwd=os.path.join(repo_root, path)
+              )
+              info['remote_commit'] = result.stdout.strip()[:7] if result.returncode == 0 else 'N/A'
+
+              # 检查是否落后
+              if info.get('commit') != info.get('remote_commit') and info.get('remote_commit') != 'N/A':
+                info['status'] = 'behind'
+              else:
+                info['status'] = 'synced'
+
+              # 获取 README 描述
+              readme_paths = [
+                  os.path.join(repo_root, path, 'README.md'),
+                  os.path.join(repo_root, path, 'README_zh.md'),
+                  os.path.join(repo_root, path, 'README_EN.md')
+              ]
+              for readme in readme_paths:
+                  if os.path.exists(readme):
+                      with open(readme, 'r', encoding='utf-8', errors='ignore') as f:
+                          content = f.read()[:500]
+                          # 提取标题
+                          title_match = re.search(r'#\s+(.+)', content)
+                          if title_match:
+                              info['description'] = title_match.group(1).strip()
+                              break
+
+              # 获取最新 commit 信息
+              result = subprocess.run(
+                  ['git', 'log', '-1', '--format=%ci'],
+                  capture_output=True, text=True, cwd=os.path.join(repo_root, path)
+              )
+              if result.returncode == 0 and result.stdout.strip():
+                  info['last_updated'] = result.stdout.strip()[:10]
+
+              # 获取仓库 stars
+              if 'github.com' in url:
+                  match = re.search(r'github\.com[/:](.+?)(?:\.git)?$', url)
+                  if match:
+                      repo = match.group(1)
+                      try:
+                          import requests
+                          api_url = f"https://api.github.com/repos/{repo}"
+                          resp = requests.get(api_url, timeout=5)
+                          if resp.status_code == 200:
+                              data = resp.json()
+                              info['stars'] = data.get('stargazers_count', 0)
+                              info['forks'] = data.get('forks_count', 0)
+                              info['language'] = data.get('language', 'N/A')
+                      except:
+                          pass
+
+            except Exception as e:
+              info['status'] = f'error: {str(e)}'
+
+            return info
+
+          # 主程序
+          repo_root = '.'
+
+          # 解析 .gitmodules
+          submodules = []
+          current_section = None
+
+          with open('.gitmodules', 'r') as f:
+              for line in f:
+                  section_match = re.match(r'\[submodule\s+"([^"]+)"\]', line)
+                  if section_match:
+                      current_section = section_match.group(1)
+                      submodules.append({'path': current_section})
+                  elif '=' in line and current_section:
+                      key, value = line.split('=', 1)
+                      submodules[-1][key.strip()] = value.strip()
+
+          # 收集每个子模块信息
+          all_info = []
+          for sm in submodules:
+              if 'url' in sm and 'path' in sm:
+                  info = get_submodule_info(sm['path'], sm['url'])
+                  all_info.append(info)
+
+          # 生成 Markdown 报告
+          now = datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')
+
+          report = f"""# 📦 子仓库状态汇总报告
+
+> 生成时间: {now}
+> 仓库: [adminlove520/multi-CyberSecurity](https://github.com/adminlove520/multi-CyberSecurity)
+
+## 📊 概览
+
+| 指标 | 值 |
+|------|-----|
+| 子仓库总数 | {len(all_info)} |
+| 同步正常 | {sum(1 for i in all_info if i['status'] == 'synced')} |
+| 落后远程 | {sum(1 for i in all_info if i['status'] == 'behind')} |
+| 异常 | {sum(1 for i in all_info if 'error' in str(i.get('status', '')))} |
+
+---
+
+## 📁 子仓库详情
+
+| 名称 | 描述 | 当前版本 | 远程版本 | Stars | 状态 |
+|------|------|----------|----------|-------|------|
+"""
+
+          for info in all_info:
+              status_icon = '✅' if info['status'] == 'synced' else '🔄' if info['status'] == 'behind' else '❌'
+              desc = info.get('description', 'N/A')[:40]
+              stars = info.get('stars', 'N/A')
+              report += f"| `{info['path']}` | {desc} | `{info.get('commit', 'N/A')}` | `{info.get('remote_commit', 'N/A')}` | {stars} | {status_icon} |\n"
+
+          report += """
+---
+
+## 🔧 子仓库目录结构
+
+```
+"""
+
+          for info in all_info:
+              report += f"├── {info['path']}/\n"
+
+          report += """```
+
+---
+
+## 📈 版本分布
+
+"""
+
+          # 统计各子仓库最新 tag
+          for info in all_info:
+              if info.get('url'):
+                  report += f"### `{info['path']}`\n"
+                  report += f"- URL: {info['url']}\n"
+                  report += f"- 当前: `{info.get('commit', 'N/A')}`\n"
+                  report += f"- Stars: {info.get('stars', 'N/A')} | Forks: {info.get('forks', 'N/A')}\n"
+                  report += f"- 语言: {info.get('language', 'N/A')}\n\n"
+
+          report += f"""---
+
+## 🔗 快速链接
+
+"""
+          for info in all_info:
+              if info.get('url') and 'github.com' in info['url']:
+                  report += f"- [{info['path']}]({info['url'].replace('.git', '')}) "
+                  if info.get('stars'):
+                      report += f"⭐ {info['stars']}"
+                  report += "\n"
+
+          report += """
+---
+
+*🤖 由 GitHub Actions 自动生成 | [查看工作流](https://github.com/adminlove520/multi-CyberSecurity/actions)*
+
+<details>
+<summary>📋 原始数据 (JSON)</summary>
+
+```json
+"""
+
+          # 添加原始 JSON 数据
+          report += json.dumps([{k: v for k, v in i.items() if k != 'description'} for i in all_info], indent=2, ensure_ascii=False)
+
+          report += """
+```
+</details>
+"""
+
+          # 写入报告
+          with open('SUBMODULE_REPORT.md', 'w', encoding='utf-8') as f:
+              f.write(report)
+
+          print("报告已生成: SUBMODULE_REPORT.md")
+          print(f"共 {len(all_info)} 个子仓库")
+          print(f"同步正常: {sum(1 for i in all_info if i['status'] == 'synced')}")
+          print(f"落后远程: {sum(1 for i in all_info if i['status'] == 'behind')}")
+
+          PYEOF
+
+      - name: 提交报告到仓库
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # 检查是否有变更
+          if git diff --quiet HEAD -- SUBMODULE_REPORT.md; then
+            echo "报告无变化，不需更新"
+          else
+            BRANCH="docs/submodule-report-$(date +%Y%m%d)"
+
+            git checkout -b "$BRANCH"
+            git add SUBMODULE_REPORT.md
+
+            git commit -m "docs: update submodule status report
+
+            - Auto-generated comprehensive submodule report
+            - Includes sync status, stars, version info
+            - Timestamp: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+
+            Co-Authored-By: github-actions[bot] <github-actions[bot]@users.noreply.github.com>"
+
+            # 如果 main 分支存在则推送
+            git push origin "$BRANCH" 2>/dev/null || echo "推送失败（可能没有变更）"
+
+            # 创建或更新 PR
+            PR_EXISTS=$(gh pr list --head "$BRANCH" --json number --jq 'length' 2>/dev/null || echo "0")
+            if [[ "$PR_EXISTS" == "0" ]]; then
+              gh pr create \
+                --repo adminlove520/multi-CyberSecurity \
+                --head "$BRANCH" \
+                --base main \
+                --title "docs: submodule status report $(date +%Y-%m-%d)" \
+                --body "自动生成的子仓库状态汇总报告" \
+                --fill || echo "PR 创建失败"
+            fi
+          fi
+
+      - name: 上传 Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: submodule-full-report
+          path: SUBMODULE_REPORT.md
+          retention-days: 30

@@ -1,5 +1,42 @@
 # Changelog
 
+## [3.6.0] - 2026-07-10
+
+### 🚀 新增功能
+
+#### reverse-skill 子仓库集成
+- 添加 `external/reverse-skill` 为 git submodule
+- 包含 **40 个 CTF 竞赛场景** (android-hooking, kernel-container-escape, kerberos-delegation 等)
+- 包含 **20+ 专项技能** (apk-reverse, ida-reverse, js-reverse, malware-analysis 等)
+- 包含 Burp MCP 扩展、工具链路由矩阵
+
+#### 子仓库管理体系
+新增 3 个 GitHub Actions 工作流：
+
+| 工作流 | 触发条件 | 功能 |
+|--------|----------|------|
+| `submodule-health-check.yml` | 每天 06:00 / 手动 | 检测 404/403 等异常 |
+| `submodule-sync.yml` | 每周一 08:00 / 手动 | 自动同步到最新版本 |
+| `submodule-report.yml` | 每周一/四 10:00 / 手动 | 生成状态汇总报告 |
+
+#### 工作流优化
+- 更新 `update-submodules.yml` - 支持指定单个子模块更新
+- 添加 `repository_dispatch` 触发支持
+- 统一提交信息格式和 Co-Authored-By
+
+### 📁 新增文件
+
+```
+.github/workflows/
+├── submodule-health-check.yml  # 子仓库健康检查
+├── submodule-sync.yml           # 子仓库定时同步
+└── submodule-report.yml        # 子仓库状态报告
+
+external/reverse-skill/          # reverse-skill 子仓库
+```
+
+---
+
 ## [3.5.0] - 2026-05-29
 
 ### 🚀 新增功能
