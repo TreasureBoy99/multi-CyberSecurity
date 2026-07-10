@@ -1,0 +1,132 @@
+{
+  "$schema": "https://raw.githubusercontent.com/adminlove520/multi-CyberSecurity/main/tools/mcp-config.schema.json",
+  "name": "multi-CyberSecurity Tools",
+  "version": "1.0.0",
+  "description": "统一工具 MCP 配置 - 方便 Agents 按需调用",
+
+  "tools": {
+    "burp": {
+      "type": "mcp",
+      "name": "BurpSuite Professional",
+      "host": "localhost",
+      "port": 8090,
+      "protocol": "http",
+      "enabled": true,
+      "capabilities": [
+        "proxy",
+        "scanner",
+        "intruder",
+        "repeater",
+        "sequencer",
+        "decoder",
+        "comparer"
+      ],
+      "scripts": "tools/burp/scripts",
+      "extensions": "tools/burp/extensions",
+      "macros": "tools/burp/macros"
+    },
+
+    "playwright": {
+      "type": "local",
+      "name": "Playwright Browser Automation",
+      "command": "npx playwright",
+      "browsers": ["chromium", "firefox", "webkit"],
+      "headless": true,
+      "slow_mo": 100,
+      "enabled": true,
+      "scripts": "tools/playwright/scripts",
+      "templates": "tools/playwright/templates",
+      "config": {
+        "timeout": 30000,
+        "viewport": {"width": 1280, "height": 720}
+      }
+    },
+
+    "chromium-cdp": {
+      "type": "cdp",
+      "name": "Chrome/Edge CDP Debugging",
+      "executable": {
+        "win32": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+        "linux": "/usr/bin/chromium",
+        "darwin": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+      },
+      "remote_debugging_port": 9222,
+      "headless": true,
+      "enabled": true,
+      "commands": "tools/chromium/cdp-commands",
+      "exploit_scripts": "tools/chromium/exploit-scripts"
+    },
+
+    "fscan": {
+      "type": "local",
+      "name": "fscan (内网综合扫描)",
+      "binary": {
+        "win32": "fscan.exe",
+        "linux": "./fscan",
+        "darwin": "./fscan"
+      },
+      "templates": "tools/fscan/templates",
+      "output_parsers": "tools/fscan/output-parsers",
+      "enabled": true,
+      "default_args": ["-np", "-silent", "-nocolor"]
+    },
+
+    "kali": {
+      "type": "ssh",
+      "name": "Kali Linux Tools",
+      "host": "kali.local",
+      "port": 22,
+      "user": "root",
+      "key_file": null,
+      "password_env": "KALI_SSH_PASSWORD",
+      "enabled": true,
+      "tools": {
+        "recon": ["nmap", "masscan", "rustscan", "ffuf", "gobuster", "dirb"],
+        "vuln_scan": ["nuclei", "nikto", "sqlmap", "xsstrike", "ssrfmap"],
+        "privesc": ["linpeas", "linEnum", "linux-exploit-suggester", "winpeas", "PowerUp"],
+        "ad": ["bloodhound", "crackmapexec", "impacket", "mimikatz", "responder", "ntlmrelayx"],
+        "web": ["burpsuite", "OWASP ZAP", "wfuzz", "commix", "jwt_tool"]
+      }
+    },
+
+    "nuclei": {
+      "type": "local",
+      "name": "Nuclei Vulnerability Scanner",
+      "command": "nuclei",
+      "templates": "https://github.com/projectdiscovery/nuclei-templates",
+      "enabled": true,
+      "severity_filter": ["critical", "high", "medium"]
+    }
+  },
+
+  "routing": {
+    "web_recon": {
+      "description": "Web 应用信息搜集",
+      "sequence": ["nmap", "ffuf", "nuclei"],
+      "auto_select": true
+    },
+    "vuln_scan": {
+      "description": "漏洞扫描",
+      "sequence": ["nuclei", "sqlmap", "xsstrike"],
+      "auto_select": true
+    },
+    "ad_attack": {
+      "description": "内网域渗透",
+      "sequence": ["bloodhound", "crackmapexec", "impacket"],
+      "requires_creds": true
+    },
+    "browser_auto": {
+      "description": "浏览器自动化测试",
+      "sequence": ["playwright", "chromium-cdp"],
+      "use_case": "login_sequence, api_fuzzing, vuln_exploitation"
+    }
+  },
+
+  "execution": {
+    "max_concurrent": 5,
+    "timeout_seconds": 300,
+    "retry_count": 2,
+    "output_format": "json",
+    "output_dir": "results"
+  }
+}

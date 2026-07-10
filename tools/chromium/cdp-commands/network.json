@@ -1,0 +1,79 @@
+{
+  "name": "Network Monitoring Commands",
+  "description": "CDP 网络监控命令集",
+  "version": "1.0",
+
+  "commands": {
+    "enable_network": {
+      "description": "启用网络监控",
+      "method": "Network.enable",
+      "params": {}
+    },
+
+    "disable_network": {
+      "description": "禁用网络监控",
+      "method": "Network.disable",
+      "params": {}
+    },
+
+    "get_cookies": {
+      "description": "获取当前域的所有 Cookie",
+      "method": "Network.getCookies",
+      "params": {
+        "urls": ["{{current_url}}"]
+      }
+    },
+
+    "set_cookie": {
+      "description": "设置 Cookie",
+      "method": "Network.setCookie",
+      "params": {
+        "name": "{{name}}",
+        "value": "{{value}}",
+        "domain": "{{domain}}",
+        "path": "/"
+      }
+    },
+
+    "delete_cookies": {
+      "description": "删除 Cookie",
+      "method": "Network.deleteCookies",
+      "params": {
+        "name": "{{name}}",
+        "domain": "{{domain}}"
+      }
+    },
+
+    "clear_browser_cache": {
+      "description": "清除浏览器缓存",
+      "method": "Network.clearBrowserCache",
+      "params": {}
+    },
+
+    "get_response_body": {
+      "description": "获取响应体",
+      "method": "Network.getResponseBody",
+      "params": {
+        "requestId": "{{requestId}}"
+      }
+    },
+
+    "replay_xhr": {
+      "description": "重放 XHR/Fetch 请求",
+      "method": "Network.replayXHR",
+      "params": {
+        "requestId": "{{requestId}}"
+      }
+    },
+
+    "set_request_interception": {
+      "description": "设置请求拦截",
+      "method": "Network.setRequestInterception",
+      "params": {
+        "patterns": [
+          {"urlPattern": "*", "resourceType": "document", "interceptionStage": "headersReceived"}
+        ]
+      }
+    }
+  }
+}
