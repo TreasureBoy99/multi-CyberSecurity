@@ -55,8 +55,8 @@ jobs:
         run: |
           echo '# 🔄 子仓库同步报告' > submodule-sync-report.md
           echo '' >> submodule-sync-report.md
-          echo '**同步时间**: $(date -u '"'"'+%Y-%m-%d %H:%M:%S UTC'"'"')' >> submodule-sync-report.md
-          echo '**触发方式**: ${{ github.event_name == '"'"'schedule'"'"' && '"'"'定时任务'"'"' || '"'"'手动触发'"'"' }}' >> submodule-sync-report.md
+          echo '**同步时间**: '$(date -u '+%Y-%m-%d %H:%M:%S UTC') >> submodule-sync-report.md
+          echo '**触发方式**: 定时任务' >> submodule-sync-report.md
           echo '' >> submodule-sync-report.md
           echo '## 同步结果' >> submodule-sync-report.md
           echo '' >> submodule-sync-report.md
