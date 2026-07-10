@@ -4,6 +4,11 @@
 
 ### 🚀 新增功能
 
+#### 子仓库扩展 (Claude-BugHunter & Anthropic-Cybersecurity-Skills)
+- 添加 `external/Claude-BugHunter` (71 skills, Bug Hunting & Red Team)
+- 添加 `external/Anthropic-Cybersecurity-Skills` (817 skills, 29 安全领域)
+- 新增 `ACKNOWLEDGEMENTS.md` 鸣谢文档
+
 #### reverse-skill 子仓库集成
 - 添加 `external/reverse-skill` 为 git submodule
 - 包含 **40 个 CTF 竞赛场景** (android-hooking, kernel-container-escape, kerberos-delegation 等)

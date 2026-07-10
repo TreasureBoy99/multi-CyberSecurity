@@ -13,3 +13,9 @@
 [submodule "external/reverse-skill"]
 	path = external/reverse-skill
 	url = https://github.com/zhaoxuya520/reverse-skill.git
+[submodule "external/Claude-BugHunter"]
+	path = external/Claude-BugHunter
+	url = https://github.com/elementalsouls/Claude-BugHunter.git
+[submodule "external/Anthropic-Cybersecurity-Skills"]
+	path = external/Anthropic-Cybersecurity-Skills
+	url = https://github.com/mukul975/Anthropic-Cybersecurity-Skills.git
