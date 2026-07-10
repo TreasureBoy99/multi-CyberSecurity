@@ -1,0 +1,36 @@
+{
+  "name": "multi-CyberSecurity ATT&CK Layer",
+  "versions": {
+    "attack": "15.1",
+    "navigator": "4.12.1",
+    "layer": "4.6"
+  },
+  "domain": "enterprise-attack",
+  "description": "multi-CyberSecurity 项目 ATT&CK 覆盖层",
+  "filters": {
+    "platforms": ["Windows", "Linux", "macOS", "Network", "Cloud"]
+  },
+  "sorting": 0,
+  "layout": {
+    "layout": "side",
+    "aggregateFunction": "average",
+    "showID": false,
+    "showName": true,
+    "showAggregateScores": false,
+    "leftValue": "percentage",
+    "rightValue": "percentage"
+  },
+  "hideDisabled": false,
+  "techniques": [],
+  "gradient": {
+    "colors": ["#ffffff", "#66b3ff", "#0066cc", "#ff6666"],
+    "minValue": 0,
+    "maxValue": 100
+  },
+  "legendItems": [],
+  "metadata": [],
+  "showTacticRowBackground": true,
+  "tacticRowBackground": "#dddddd",
+  "selectTechniquesAcrossTactics": true,
+  "selectSubtechniquesWithParent": false
+}

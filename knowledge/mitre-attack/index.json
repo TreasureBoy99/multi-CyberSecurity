@@ -1,0 +1,27 @@
+{
+  "name": "MITRE ATT&CK",
+  "version": "v15.1",
+  "last_updated": "2026-07-10",
+  "description": "MITRE ATT&CK 战术与技术知识库",
+  "url": "https://attack.mitre.org/",
+  "navigator": {
+    "layer_template": "knowledge/mitre-attack/navigator-layers/template.json",
+    "enterprise": "https://raw.githubusercontent.com/mitre-attack/attack-navigator/refs/heads/master/layers/enterprise/enterprise一层.json"
+  },
+  "tactics": [
+    {"id": "TA0043", "name": "Reconnaissance", "description": "侦察"},
+    {"id": "TA0042", "name": "Resource Development", "description": "资源开发"},
+    {"id": "TA0001", "name": "Initial Access", "description": "初始访问"},
+    {"id": "TA0002", "name": "Execution", "description": "执行"},
+    {"id": "TA0003", "name": "Persistence", "description": "持久化"},
+    {"id": "TA0004", "name": "Privilege Escalation", "description": "权限提升"},
+    {"id": "TA0005", "name": "Defense Evasion", "description": "防御规避"},
+    {"id": "TA0006", "name": "Credential Access", "description": "凭证访问"},
+    {"id": "TA0007", "name": "Discovery", "description": "发现"},
+    {"id": "TA0008", "name": "Lateral Movement", "description": "横向移动"},
+    {"id": "TA0009", "name": "Collection", "description": "收集"},
+    {"id": "TA0011", "name": "Command and Control", "description": "命令与控制"},
+    {"id": "TA0010", "name": "Exfiltration", "description": "数据泄露"},
+    {"id": "TA0040", "name": "Impact", "description": "影响"}
+  ]
+}

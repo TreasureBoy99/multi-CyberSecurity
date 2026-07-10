@@ -31,3 +31,6 @@
 [submodule "external/Vulnerability-Wiki-PoC"]
 	path = external/Vulnerability-Wiki-PoC
 	url = https://github.com/SourByte05/Vulnerability-Wiki-PoC.git
+[submodule "knowledge/owasp-top10"]
+	path = knowledge/owasp-top10
+	url = https://github.com/OWASP/Top10.git
