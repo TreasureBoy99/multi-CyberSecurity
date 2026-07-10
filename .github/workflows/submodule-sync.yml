@@ -110,8 +110,31 @@ jobs:
           git push origin "$BRANCH"
           echo "branch=$BRANCH" >> $GITHUB_OUTPUT
 
-      - name: 创建 PR 并自动合并
-        if: steps.check_changes.outputs.has_changes == 'true'
+      - name: 检查是否已有 open 的 submodule PR
+        id: check_existing_pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # 查找已有的 submodule-update open PR
+          EXISTING_PR=$(gh pr list \
+            --repo adminlove520/multi-CyberSecurity \
+            --label "submodule-update" \
+            --state "open" \
+            --json number,title \
+            --jq '.[0]' 2>/dev/null)
+
+          if [[ -n "$EXISTING_PR" ]]; then
+            PR_NUMBER=$(echo "$EXISTING_PR" | jq -r '.number')
+            echo "发现已有 open 的 PR #$PR_NUMBER，跳过创建"
+            echo "has_existing_pr=true" >> $GITHUB_OUTPUT
+            echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+          else
+            echo "没有发现 open 的 submodule-update PR"
+            echo "has_existing_pr=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: 创建新 PR
+        if: steps.check_changes.outputs.has_changes == 'true' && steps.check_existing_pr.outputs.has_existing_pr == 'false'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -128,6 +151,7 @@ jobs:
             --fill)
 
           echo "PR created: $PR_URL"
+          echo "pr_url=$PR_URL" >> $GITHUB_OUTPUT
 
           # 自动创建 label（如果不存在）
           gh label create "submodule-update" \
@@ -138,18 +162,34 @@ jobs:
           # 添加 label 到 PR
           gh pr edit "$PR_URL" --add-label "submodule-update"
 
+      - name: 合并 PR
+        if: steps.check_changes.outputs.has_changes == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # 确定使用哪个 PR
+          if [[ "${{ steps.check_existing_pr.outputs.has_existing_pr }}" == "true" ]]; then
+            PR_NUMBER="${{ steps.check_existing_pr.outputs.pr_number }}"
+            echo "使用已有 PR #$PR_NUMBER"
+          else
+            PR_NUMBER=$(echo "${{ steps.create_pr.outputs.pr_url }}" | grep -o '[0-9]*$')
+            echo "使用新创建 PR #$PR_NUMBER"
+          fi
+
+          PR_URL="https://github.com/adminlove520/multi-CyberSecurity/pull/$PR_NUMBER"
+
           # 等待 CI 检查完成
           echo "等待 CI 检查..."
           gh pr wait "$PR_URL" --interval 10 --timeout 300 || echo "等待超时，继续尝试合并"
 
           # 自动合并 PR (squash 合并)
           echo "尝试合并 PR..."
-          gh pr merge "$PR_URL" \
+          gh pr merge "$PR_NUMBER" \
             --squash \
             --delete-branch \
             --repo adminlove520/multi-CyberSecurity
 
-          echo "✅ PR 已合并并删除源分支"
+          echo "✅ PR #$PR_NUMBER 已合并并删除源分支"
 
       - name: 上传报告
         uses: actions/upload-artifact@v4
