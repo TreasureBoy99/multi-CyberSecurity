@@ -110,7 +110,7 @@ jobs:
           git push origin "$BRANCH"
           echo "branch=$BRANCH" >> $GITHUB_OUTPUT
 
-      - name: 创建 PR
+      - name: 创建 PR 并自动合并
         if: steps.check_changes.outputs.has_changes == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -137,6 +137,19 @@ jobs:
 
           # 添加 label 到 PR
           gh pr edit "$PR_URL" --add-label "submodule-update"
+
+          # 等待 CI 检查完成
+          echo "等待 CI 检查..."
+          gh pr wait "$PR_URL" --interval 10 --timeout 300 || echo "等待超时，继续尝试合并"
+
+          # 自动合并 PR (squash 合并)
+          echo "尝试合并 PR..."
+          gh pr merge "$PR_URL" \
+            --squash \
+            --delete-branch \
+            --repo adminlove520/multi-CyberSecurity
+
+          echo "✅ PR 已合并并删除源分支"
 
       - name: 上传报告
         uses: actions/upload-artifact@v4
