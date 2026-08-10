@@ -106,7 +106,7 @@
 ---
 
 ### 🔴 cve_monitor
-**仓库**: [adminlove520/cve_monitor](https://github.com/adminlove520/cve_monitor)
+**仓库**: [TreasureBoy99/cve_monitor](https://github.com/TreasureBoy99/cve_monitor)
 
 **描述**: 多平台 CVE RSS/Tracker 监控系统
 

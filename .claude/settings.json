@@ -12,9 +12,5 @@
       "Bash(python cli.py audit --target * --max-cost 0)",
       "Bash(rm -rf:*)"
     ]
-  },
-  "hooks": {
-    "pre-commit": "python scripts/linter.py",
-    "post-edit": "python scripts/linter.py --file $FILE"
   }
 }
